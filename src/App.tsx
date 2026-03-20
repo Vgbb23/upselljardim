@@ -8,6 +8,8 @@ import { CircleCheck as CheckCircle2, ShieldCheck, Zap, Sparkles, ShoppingCart, 
  */
 
 export default function App() {
+  const fruitfyProductId = import.meta.env.VITE_FRUITFY_PRODUCT_ID as string | undefined;
+
   const getNestedValue = (obj: any, path: string): any => {
     return path.split('.').reduce((acc: any, part: string) => {
       if (acc && typeof acc === 'object') {
@@ -89,11 +91,30 @@ export default function App() {
       .replace(/(\d{5})(\d{1,4})$/, '$1-$2');
   };
 
+  const isValidCpf = (cpfDigits: string): boolean => {
+    if (!/^\d{11}$/.test(cpfDigits)) return false;
+    if (/^(\d)\1{10}$/.test(cpfDigits)) return false;
+
+    const calcDigit = (base: string, factor: number) => {
+      const total = base
+        .split('')
+        .reduce((sum, digit) => sum + Number(digit) * factor--, 0);
+      const rest = (total * 10) % 11;
+      return rest === 10 ? 0 : rest;
+    };
+
+    const first = calcDigit(cpfDigits.slice(0, 9), 10);
+    const second = calcDigit(cpfDigits.slice(0, 10), 11);
+
+    return first === Number(cpfDigits[9]) && second === Number(cpfDigits[10]);
+  };
+
   const [selectedOption, setSelectedOption] = useState<number>(3); // Default to 3 bottles
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [cpf, setCpf] = useState<string>('');
+  const [cpfTouched, setCpfTouched] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string>('');
   const [checkoutResponse, setCheckoutResponse] = useState<any>(null);
@@ -122,6 +143,10 @@ export default function App() {
   ];
 
   const currentOption = options.find(o => o.bottles === selectedOption) || options[1];
+  const sanitizedCpfInput = cpf.replace(/\D/g, '');
+  const showCpfInvalid =
+    cpfTouched && sanitizedCpfInput.length > 0 && !isValidCpf(sanitizedCpfInput);
+
   const itemValueByBottles: Record<number, number> = {
     1: 2990,
     3: 5790
@@ -139,13 +164,17 @@ export default function App() {
       return;
     }
 
-    if (sanitizedCpf.length !== 11) {
-      setCheckoutError('CPF inválido. Informe 11 dígitos.');
+    if (!isValidCpf(sanitizedCpf)) {
+      setCheckoutError('CPF inválido. Verifique e tente novamente.');
       return;
     }
 
     if (!itemValueByBottles[selectedOption]) {
       setCheckoutError('Oferta selecionada inválida.');
+      return;
+    }
+    if (!fruitfyProductId) {
+      setCheckoutError('Produto não configurado. Defina VITE_FRUITFY_PRODUCT_ID no arquivo .env.');
       return;
     }
 
@@ -165,7 +194,7 @@ export default function App() {
           cpf: sanitizedCpf,
           items: [
             {
-              id: 'a0fc4354-c423-4852-a527-ede0dc5b0559',
+              id: fruitfyProductId,
               value: itemValueByBottles[selectedOption],
               quantity: 1
             }
@@ -507,10 +536,21 @@ export default function App() {
           />
           <input
             value={cpf}
-            onChange={(e) => setCpf(formatCpf(e.target.value))}
+            onChange={(e) => {
+              setCpf(formatCpf(e.target.value));
+              if (!cpfTouched) setCpfTouched(true);
+            }}
+            onBlur={() => setCpfTouched(true)}
             placeholder="CPF"
-            className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500"
+            className={`w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none ${
+              showCpfInvalid ? 'border-rose-400 focus:border-rose-500' : 'border-stone-200 focus:border-emerald-500'
+            }`}
           />
+          {showCpfInvalid && (
+            <p className="text-xs font-semibold text-rose-600">
+              CPF inválido. Confira os números informados.
+            </p>
+          )}
           <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
             Este produto vai ser entregue junto com seu pedido.
           </p>
