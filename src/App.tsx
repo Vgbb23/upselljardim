@@ -118,7 +118,6 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string>('');
   const [checkoutResponse, setCheckoutResponse] = useState<any>(null);
-  const [copiedPixCode, setCopiedPixCode] = useState<boolean>(false);
   const [showRecentPurchase, setShowRecentPurchase] = useState<boolean>(true);
 
   const options = [
@@ -145,7 +144,7 @@ export default function App() {
   const currentOption = options.find(o => o.bottles === selectedOption) || options[1];
   const sanitizedCpfInput = cpf.replace(/\D/g, '');
   const showCpfInvalid =
-    cpfTouched && sanitizedCpfInput.length > 0 && !isValidCpf(sanitizedCpfInput);
+    cpfTouched && sanitizedCpfInput.length === 11 && !isValidCpf(sanitizedCpfInput);
 
   const itemValueByBottles: Record<number, number> = {
     1: 2990,
@@ -273,17 +272,6 @@ export default function App() {
     ])
   );
 
-  const handleCopyPixCode = async () => {
-    if (!pixCode) return;
-    try {
-      await navigator.clipboard.writeText(pixCode);
-      setCopiedPixCode(true);
-      setTimeout(() => setCopiedPixCode(false), 2000);
-    } catch {
-      setCheckoutError('Não foi possível copiar automaticamente. Copie o código manualmente.');
-    }
-  };
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowRecentPurchase(false);
@@ -326,6 +314,7 @@ export default function App() {
                 value={pixCode}
                 readOnly
                 rows={4}
+                onFocus={(e) => e.currentTarget.select()}
                 className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
               />
               {!pixCode && (
@@ -333,13 +322,11 @@ export default function App() {
                   Ainda não encontramos o campo de copia e cola na resposta. Se quiser, eu ajusto para o formato exato que sua API retornou.
                 </p>
               )}
-              <button
-                onClick={handleCopyPixCode}
-                disabled={!pixCode}
-                className="mt-2 w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm disabled:opacity-50"
-              >
-                {copiedPixCode ? 'Código copiado!' : 'Copiar código PIX'}
-              </button>
+              {pixCode && (
+                <p className="mt-2 text-xs text-stone-600 bg-stone-100 border border-stone-200 rounded-xl px-3 py-2">
+                  Toque no campo acima para selecionar e copie manualmente (Ctrl/Cmd + C).
+                </p>
+              )}
             </div>
 
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
