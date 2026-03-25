@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CircleCheck as CheckCircle2, ShieldCheck, Zap, Sparkles, ShoppingCart, ArrowRight, Info, CircleAlert as AlertCircle } from 'lucide-react';
+import {
+  CircleCheck as CheckCircle2,
+  ShieldCheck,
+  Zap,
+  Sparkles,
+  ShoppingCart,
+  ArrowRight,
+  Info,
+  CircleAlert as AlertCircle,
+  Copy,
+} from 'lucide-react';
 
 /**
  * @license
@@ -119,6 +129,8 @@ export default function App() {
   const [checkoutError, setCheckoutError] = useState<string>('');
   const [checkoutResponse, setCheckoutResponse] = useState<any>(null);
   const [showRecentPurchase, setShowRecentPurchase] = useState<boolean>(true);
+  const [copied, setCopied] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(12 * 60 + 54);
 
   const options = [
     {
@@ -224,6 +236,8 @@ export default function App() {
   };
 
   const orderId = pickFirstString(checkoutResponse, [
+    'data.order_uuid',
+    'data.uuid',
     'data.order.id',
     'data.order_id',
     'data.orderId',
@@ -233,12 +247,15 @@ export default function App() {
   ]);
 
   const pixCode = pickFirstString(checkoutResponse, [
+    'data.pix_code',
+    'data.pix_copiaecola',
+    'data.pix_copy_paste',
+    'data.pixCopyPaste',
+    'data.pixCode',
     'data.pix.copy_paste',
     'data.pix.copyAndPaste',
     'data.pix.emv',
     'data.pix.payload',
-    'data.pix_code',
-    'data.pixCode',
     'pix.copy_paste',
     'pix.copyAndPaste',
     'pix.emv',
@@ -287,67 +304,162 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!checkoutResponse) return undefined;
+    setCountdownSeconds(12 * 60 + 54);
+    const intervalId = window.setInterval(() => {
+      setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [checkoutResponse]);
+
+  const handleCopyPixCode = async () => {
+    if (!pixCode) return;
+    try {
+      await navigator.clipboard.writeText(pixCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* fallback: utilizador copia pelo preview */
+    }
+  };
+
   if (checkoutResponse) {
+    const firstName = name.trim().split(' ')[0] || 'cliente';
+    const pixPreview = pixCode
+      ? `${pixCode.slice(0, 26)}...${pixCode.slice(-16)}`
+      : 'Código PIX não retornado automaticamente.';
+    const minutesLeft = Math.floor(countdownSeconds / 60)
+      .toString()
+      .padStart(2, '0');
+    const secondsLeft = (countdownSeconds % 60).toString().padStart(2, '0');
+    const progressPercent = Math.max(0, (countdownSeconds / (12 * 60 + 54)) * 100);
+    const apiSuccessMessage =
+      (typeof checkoutResponse?.message === 'string' && checkoutResponse.message.trim()) ||
+      (checkoutResponse?.data &&
+        typeof checkoutResponse.data === 'object' &&
+        typeof checkoutResponse.data.message === 'string' &&
+        checkoutResponse.data.message.trim()) ||
+      'Cobrança PIX criada com sucesso.';
+    const pixQrCodeUrl = pixCode
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(pixCode)}`
+      : '';
+
     return (
-      <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-emerald-100">
-        <main className="max-w-md mx-auto px-5 py-8">
-          <div className="bg-white border border-emerald-100 rounded-3xl p-5 shadow-sm">
-            <h1 className="text-2xl font-extrabold tracking-tight text-emerald-700 mb-2">
-              PIX gerado com sucesso
-            </h1>
-            <p className="text-sm text-stone-600 mb-4">
-              Faça o pagamento agora para confirmar seu pedido.
-            </p>
-
-            {orderId && (
-              <p className="text-xs text-stone-500 mb-4">
-                Pedido: <span className="font-bold text-stone-700">{orderId}</span>
-              </p>
-            )}
-
-            {qrCode ? (
-              <div className="bg-white border border-stone-200 rounded-2xl p-3 mb-4">
-                <img src={qrCode} alt="QR Code PIX" className="w-full rounded-xl" />
+      <div className="bg-gray-50 min-h-screen py-6 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+              <div className="w-9 h-9 bg-green-600 rounded-full flex items-center justify-center text-white font-black text-base">
+                JC
               </div>
-            ) : (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
-                QR Code não encontrado na resposta. Use o PIX copia e cola abaixo.
-              </p>
-            )}
-
-            <div className="mb-4">
-              <p className="text-xs font-bold text-stone-700 mb-2">PIX copia e cola</p>
-              <textarea
-                value={pixCode}
-                readOnly
-                rows={4}
-                onFocus={(e) => e.currentTarget.select()}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
-              />
-              {!pixCode && (
-                <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                  Ainda não encontramos o campo de copia e cola na resposta. Se quiser, eu ajusto para o formato exato que sua API retornou.
-                </p>
-              )}
-              {pixCode && (
-                <p className="mt-2 text-xs text-stone-600 bg-stone-100 border border-stone-200 rounded-xl px-3 py-2">
-                  Toque no campo acima para selecionar e copie manualmente (Ctrl/Cmd + C).
-                </p>
-              )}
-            </div>
-
-            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-              <h2 className="text-sm font-black text-stone-700 mb-2 uppercase tracking-wide">Como pagar</h2>
-              <ol className="text-xs text-stone-600 space-y-2 list-decimal pl-4">
-                <li>Abra o app do seu banco e entre em PIX.</li>
-                <li>Escolha pagar com QR Code ou PIX copia e cola.</li>
-                <li>Escaneie o QR Code acima ou cole o código.</li>
-                <li>Confira os dados e confirme o pagamento.</li>
-                <li>Após a confirmação, seu pedido será processado automaticamente.</li>
-              </ol>
+              <span className="text-base font-extrabold text-green-800 tracking-tighter">
+                Jardim<span className="text-gray-900">daCida</span>
+              </span>
             </div>
           </div>
-        </main>
+
+          <div className="flex items-center justify-between mb-4 max-w-2xl mx-auto">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Checkout seguro</p>
+              <h2 className="text-xl font-black text-[#10233F]">Sérum — PIX</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCheckoutResponse(null);
+                setCopied(false);
+              }}
+              className="px-4 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition font-bold text-xs uppercase tracking-widest"
+            >
+              Voltar
+            </button>
+          </div>
+
+          <div className="max-w-2xl mx-auto">
+            <div className="rounded-2xl overflow-hidden border border-[#0B2445]/10 bg-white">
+              <div className="bg-[#0B2445] text-white p-5 text-center">
+                <p className="text-xs uppercase tracking-[0.18em] text-green-200 font-bold mb-1">Pagamento via PIX</p>
+                <h3 className="text-3xl leading-tight font-extrabold">Falta pouco, {firstName}</h3>
+                <p className="text-sm text-green-100 mt-1">Finalize o pagamento para confirmar seu pedido.</p>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {orderId ? (
+                  <p className="text-center text-xs text-gray-500">
+                    Pedido: <span className="font-bold text-[#0B2445]">{orderId}</span>
+                  </p>
+                ) : null}
+
+                {qrCode ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <p className="text-sm font-bold text-[#0B2445] mb-2 text-center">QR Code PIX</p>
+                    <img src={qrCode} alt="QR Code PIX" className="w-full max-w-xs mx-auto rounded-xl" />
+                  </div>
+                ) : pixQrCodeUrl ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <p className="text-sm font-bold text-[#0B2445] mb-2 text-center">QR Code PIX</p>
+                    <img src={pixQrCodeUrl} alt="QR Code PIX" className="w-full max-w-xs mx-auto rounded-xl" />
+                  </div>
+                ) : null}
+
+                <div className="rounded-xl border border-gray-200 bg-[#F7FAF8] p-4">
+                  <p className="text-sm font-bold text-[#0B2445] mb-2">PIX Copia e Cola (preview)</p>
+                  <div className="rounded-lg bg-white border border-gray-200 p-3 text-[11px] text-gray-700 break-all mb-3">
+                    {pixPreview}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyPixCode}
+                    disabled={!pixCode}
+                    className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-extrabold text-sm transition flex items-center justify-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    {copied ? 'Código copiado!' : 'Copiar e colar código'}
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-[#0B2445]/10 bg-[#EEF5F1] p-3">
+                  <p className="text-center text-sm font-semibold text-[#0B2445] mb-2">
+                    Sua oferta expira em <span className="font-black">{minutesLeft}:{secondsLeft}</span>
+                  </p>
+                  <div className="h-2 bg-[#D7E6DC] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 rounded-full transition-all duration-1000"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="text-lg font-bold text-[#0B2445] mb-3">Como pagar com PIX:</p>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    {[
+                      'Abra o app do seu banco e entre na opção Pix',
+                      'Escolha a opção Pagar / Pix copia e cola',
+                      'Escaneie o QR Code ou copie e cole o código',
+                      'Confirme o pagamento',
+                    ].map((step, index) => (
+                      <div key={step} className="flex items-start gap-2">
+                        <div className="w-5 h-5 rounded-full bg-green-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                          {index + 1}
+                        </div>
+                        <p>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {apiSuccessMessage ? (
+                  <div className="rounded-xl border border-green-200 bg-green-50 text-green-900 p-3 text-sm font-semibold">
+                    {apiSuccessMessage}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -573,15 +685,6 @@ export default function App() {
             <p className="mt-3 text-center text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
               {checkoutError}
             </p>
-          )}
-
-          {checkoutResponse && (
-            <div className="mt-3 bg-white border border-emerald-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-emerald-700 mb-2">Cobrança PIX criada com sucesso.</p>
-              <pre className="text-[10px] text-stone-600 overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                {JSON.stringify(checkoutResponse, null, 2)}
-              </pre>
-            </div>
           )}
         </div>
 
