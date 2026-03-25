@@ -179,8 +179,13 @@ export default function App() {
 
     setIsSubmitting(true);
 
+    const pixChargePath = '/api/pix/charge';
+    const pixChargeUrl =
+      (import.meta.env.VITE_PIX_API_URL as string | undefined)?.replace(/\/$/, '') || '';
+    const chargeEndpoint = pixChargeUrl ? `${pixChargeUrl}${pixChargePath}` : pixChargePath;
+
     try {
-      const response = await fetch('http://localhost:8787/api/pix/charge', {
+      const response = await fetch(chargeEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,8 +214,10 @@ export default function App() {
       }
 
       setCheckoutResponse(data);
-    } catch (error) {
-      setCheckoutError('Erro de conexão com a API local da Fruitfy.');
+    } catch {
+      setCheckoutError(
+        'Não foi possível contactar o servidor do checkout. Em desenvolvimento, rode `npm run api` na mesma máquina (proxy na porta do .env). Em produção, confirme o deploy da pasta `api/` na Vercel.'
+      );
     } finally {
       setIsSubmitting(false);
     }
